@@ -1,20 +1,24 @@
-// Main entry point for all Firebase Functions
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+require('dotenv').config();
+const { initializeApp } = require("firebase-admin/app");
+const { onRequest } = require("firebase-functions/v2/https");
 
 // Initialize Firebase Admin
-admin.initializeApp();
+initializeApp();
 
-// Import controllers
-const lineController = require("./controllers/lineController");
+// Import routes
 const dialogflowRoutes = require("./routes/dialogflow");
 const foodRoutes = require("./routes/food");
+const lineRoutes = require("./routes/line");
 
-// Export functions - Line webhook
-exports.lineWebhook = functions.https.onRequest(lineController.handleWebhook);
+// Export functions using v2 syntax
+exports.lineWebhook = onRequest((req, res) => {
+  lineRoutes(req, res);
+});
 
-// Export functions - Dialogflow webhook
-exports.dialogflowWebhook = functions.https.onRequest(require("./routes/dialogflow"));
+exports.dialogflowWebhook = onRequest((req, res) => {
+  dialogflowRoutes(req, res);
+});
 
-// Export functions - Food analysis API
-exports.foodAnalysis = functions.https.onRequest(require("./routes/food"));
+exports.foodAnalysis = onRequest((req, res) => {
+  foodRoutes(req, res);
+});

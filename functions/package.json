@@ -13,16 +13,17 @@
     "fix-style": "npm run format && npm run lint:fix"
   },
   "engines": {
-    "node": "18"
+    "node": "20"
   },
   "main": "index.js",
   "dependencies": {
     "@line/bot-sdk": "^7.5.2",
     "axios": "^1.6.2",
     "body-parser": "^1.20.2",
+    "dotenv": "^16.4.7",
     "express": "^4.18.2",
-    "firebase-admin": "^11.8.0",
-    "firebase-functions": "^4.3.1",
+    "firebase-admin": "^13.1.0",
+    "firebase-functions": "^6.3.2",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.20.1",
     "uuid-v4": "^0.1.0"

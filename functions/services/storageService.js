@@ -14,21 +14,25 @@ const logger = require("../utils/logger");
  * @param { string } [extension=jpg] - File extension
  * @returns { Promise<string>} - Public URL of the uploaded file
  */
-const uploadImage = async (imageBuffer, userId, extension = "jpg") => { try {
+const uploadImage = async (imageBuffer, userId, extension = "jpg") => {
+  try {
     // Create a temporary file
-    const tempFilePath = path.join(os.tmpdir(), `${ userId }_${ Date.now()}.${ extension }`);
+    const tempFilePath = path.join(os.tmpdir(), `${userId}_${Date.now()}.${extension}`);
     fs.writeFileSync(tempFilePath, imageBuffer);
     
-    logger.info(`Temporary file created at: ${ tempFilePath }`);
+    logger.info(`Temporary file created at: ${tempFilePath}`);
     
     // Get the default bucket or specified bucket
     const bucket = admin.storage().bucket(STORAGE.BUCKET_NAME);
-    const fileName = `${ userId }.${ extension }`;
+    const fileName = `${userId}.${extension}`;
     
     // Upload file to Firebase Storage
-    const [file] = await bucket.upload(tempFilePath, { destination: fileName,
-      metadata: { contentType: `image/${ extension }`,
-        metadata: { firebaseStorageDownloadTokens: UUID()
+    await bucket.upload(tempFilePath, {
+      destination: fileName,
+      metadata: {
+        contentType: `image/${extension}`,
+        metadata: {
+          firebaseStorageDownloadTokens: UUID()
         }
       }
     });
@@ -36,13 +40,14 @@ const uploadImage = async (imageBuffer, userId, extension = "jpg") => { try {
     // Clean up the temporary file
     fs.unlinkSync(tempFilePath);
     
-    logger.info(`Image uploaded to Firebase Storage: ${ fileName }`);
+    logger.info(`Image uploaded to Firebase Storage: ${fileName}`);
     
     // Get the public URL
-    const publicUrl = `https://storage.googleapis.com/${ bucket.name }/${ fileName }`;
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
     
     return publicUrl;
-  } catch (error) { logger.error("Error uploading image to Firebase Storage:", error);
+  } catch (error) {
+    logger.error("Error uploading image to Firebase Storage:", error);
     throw error;
   }
 };
@@ -52,16 +57,21 @@ const uploadImage = async (imageBuffer, userId, extension = "jpg") => { try {
  * @param { string } filePath - Path to the file in the bucket
  * @returns { Promise<Buffer>} - File data as a Buffer
  */
-const getFile = async (filePath) => { try { const bucket = admin.storage().bucket(STORAGE.BUCKET_NAME);
+const getFile = async (filePath) => {
+  try {
+    const bucket = admin.storage().bucket(STORAGE.BUCKET_NAME);
     const [file] = await bucket.file(filePath).download();
     
-    logger.info(`File downloaded from Firebase Storage: ${ filePath }`);
+    logger.info(`File downloaded from Firebase Storage: ${filePath}`);
     
     return file;
-  } catch (error) { logger.error(`Error retrieving file from Firebase Storage: ${ filePath }`, error);
+  } catch (error) {
+    logger.error(`Error retrieving file from Firebase Storage: ${filePath}`, error);
     throw error;
   }
 };
 
-module.exports = { uploadImage,
-  getFile };
+module.exports = { 
+  uploadImage,
+  getFile 
+};
