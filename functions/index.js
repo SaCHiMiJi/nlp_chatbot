@@ -1,24 +1,34 @@
 require('dotenv').config();
 const { initializeApp } = require("firebase-admin/app");
-const { onRequest } = require("firebase-functions/v2/https");
+const functions = require("firebase-functions/v2");
+const express = require("express");
+const logger = require("./utils/logger");
 
 // Initialize Firebase Admin
 initializeApp();
 
-// Import routes
-const dialogflowRoutes = require("./routes/dialogflow");
-const foodRoutes = require("./routes/food");
-const lineRoutes = require("./routes/line");
+// Create a LINE webhook Express app
+const app = express();
+app.use(express.json());
 
-// Export functions using v2 syntax
-exports.lineWebhook = onRequest((req, res) => {
-  lineRoutes(req, res);
+// Basic health check
+app.get('/', (req, res) => {
+  logger.info("Health check accessed");
+  res.status(200).send('Service is running');
 });
 
-exports.dialogflowWebhook = onRequest((req, res) => {
-  dialogflowRoutes(req, res);
+// Webhook endpoint
+app.post('/webhook', (req, res) => {
+  try {
+    // Simple handler for webhook verification
+    logger.info("Received webhook request");
+    res.status(200).send('OK');
+  } catch (error) {
+    logger.error("Error in webhook handler:", error);
+    // Still return 200 for LINE verification
+    res.status(200).send('OK');
+  }
 });
 
-exports.foodAnalysis = onRequest((req, res) => {
-  foodRoutes(req, res);
-});
+// Export the function - use the proper Firebase Functions v2 syntax
+exports.lineWebhook = functions.https.onRequest(app);
