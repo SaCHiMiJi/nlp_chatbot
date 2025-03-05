@@ -2,6 +2,7 @@ require("dotenv").config();
 const functions = require("firebase-functions");
 const express = require("express");
 const axios = require("axios");
+const logger = require("./utils/logger");
 const request = require("request-promise");
 
 const app = express();
@@ -10,7 +11,6 @@ app.use(express.json()); // Ensure JSON parsing for webhook events
 // Load environment variables
 const LINE_MESSAGING_API = "https://api.line.me/v2/bot/message/reply";
 const LINE_CONTENT_API = "https://api-data.line.me/v2/bot/message";
-const CHATGPT_API = "https://api.openai.com/v1/chat/completions";
 
 const LINE_HEADER = {
     "Content-Type": "application/json",
@@ -34,12 +34,14 @@ app.post("/webhook", async (req, res) => {
 });
 const postToDialogflow = (req) => {
     req.headers.host = "bots.dialogflow.com";
-    return request.post({
-        uri: `https://dialogflow.cloud.google.com/v1/integrations/line/webhook/d5bd37fa-b1b3-4f88-b265-8b49ca6015ea`,
-        headers: req.headers,
-        body: JSON.stringify(req.body)
-    });
-};
+    return axios.post(
+      `https://dialogflow.cloud.google.com/v1/integrations/line/webhook/d5bd37fa-b1b3-4f88-b265-8b49ca6015ea`,
+      JSON.stringify(req.body),
+      {
+        headers: req.headers
+      }
+    );
+  };
 // Handle text messages with Dialogflow
 async function handleTextMessage(event) {
     // Wrap the event into a request-like object
@@ -69,8 +71,8 @@ async function handleImageMessage(event) {
         // Send image for nutrition analysis
         const chatGptResponse = await analyzeImageWithChatGPT(base64Image);
         
-        // Reply with nutrition info
-        await replyMessage(event.replyToken, createFlexMessage(chatGptResponse, imageUrl));
+        // Inside handleImageMessage function, make sure you pass both the analysis and the image URL
+await replyMessage(event.replyToken, createFoodAnalysisFlex(chatGptResponse, imageUrl));
     } catch (error) {
         console.error("Image Processing Error:", error);
         await replyMessage(event.replyToken, "Sorry, I couldn't process the image.");
@@ -149,31 +151,311 @@ async function replyMessage(replyToken, text) {
         { headers: LINE_HEADER }
     );
 }
-// Function to create a Flex Message JSON
-function createFlexMessage(nutritionText, imageUrl) {
-    return {
-        type: "flex",
-        altText: "Nutrition Analysis",
-        contents: {
-            type: "bubble",
-            hero: {
-                type: "image",
-                url: imageUrl,
-                size: "full",
-                aspectRatio: "20:13",
-                aspectMode: "cover"
-            },
-            body: {
-                type: "box",
-                layout: "vertical",
-                contents: [
-                    { type: "text", text: "Nutrition Analysis", weight: "bold", size: "lg" },
-                    { type: "text", text: nutritionText, wrap: true, size: "sm", color: "#666666" }
-                ]
+// Function to create a food analysis Flex Message with image
+const createFoodAnalysisFlex = (analysisJson, imageUrl) => { 
+    let foodData;
+    
+    try {
+      // Try to parse the JSON
+      foodData = typeof analysisJson === 'object' ? analysisJson : JSON.parse(analysisJson);
+    } catch (error) { 
+      logger.error("Failed to parse food analysis JSON:", error);
+      return createErrorFlexMessage(
+        "Analysis Error", 
+        "There was an error analyzing the food. Please try again with a clearer photo."
+      );
+    }
+    
+    // Check if error occurred during analysis
+    if (foodData.error) { 
+      return createErrorFlexMessage(
+        "Analysis Error", 
+        foodData.message || "There was an error analyzing the food."
+      );
+    }
+    
+    // Check if no food was detected
+    if (!foodData.containsFood) { 
+      return createErrorFlexMessage(
+        "No Food Detected", 
+        "The image you sent doesn't appear to contain any food items."
+      );
+    }
+    
+    // Build food analysis Flex Message
+    return { 
+      type: "flex",
+      altText: "Food Analysis Results",
+      contents: { 
+        type: "bubble",
+        // Add hero image at the top
+        hero: {
+          type: "image",
+          url: imageUrl,
+          size: "full",
+          aspectRatio: "20:13",
+          aspectMode: "cover"
+        },
+        header: { 
+          type: "box",
+          layout: "vertical",
+          contents: [
+            { 
+              type: "text",
+              text: "Food Analysis",
+              weight: "bold",
+              size: "xl",
+              color: "#ffffff"
             }
+          ],
+          backgroundColor: "#27ACB2"
+        },
+        body: { 
+          type: "box",
+          layout: "vertical",
+          contents: [
+            // Food Items section
+            { 
+              type: "text",
+              text: "Food Items",
+              weight: "bold",
+              color: "#1DB446",
+              size: "md"
+            },
+            // Items list (dynamically generated)
+            ...foodData.items.map(item => ({ 
+              type: "box",
+              layout: "horizontal",
+              margin: "md",
+              contents: [
+                { 
+                  type: "text",
+                  text: item.name,
+                  size: "sm",
+                  color: "#555555",
+                  flex: 5,
+                  wrap: true 
+                },
+                { 
+                  type: "text",
+                  text: `${ item.calories } cal`,
+                  size: "sm",
+                  color: "#111111",
+                  align: "end",
+                  flex: 2 
+                }
+              ]
+            })),
+            // Total calories
+            { 
+              type: "box",
+              layout: "horizontal",
+              margin: "md",
+              contents: [
+                { 
+                  type: "text",
+                  text: "Total Calories:",
+                  size: "sm",
+                  color: "#555555",
+                  weight: "bold",
+                  flex: 5 
+                },
+                { 
+                  type: "text",
+                  text: `${ foodData.totalCalories } cal`,
+                  size: "sm",
+                  color: "#111111",
+                  weight: "bold",
+                  align: "end",
+                  flex: 2 
+                }
+              ]
+            },
+            // Separator
+            { 
+              type: "separator",
+              margin: "xl"
+            },
+            // Nutrition section
+            { 
+              type: "text",
+              text: "Nutrition",
+              weight: "bold",
+              color: "#1DB446",
+              size: "md",
+              margin: "xl"
+            },
+            // Nutrition values
+            { 
+              type: "box",
+              layout: "vertical",
+              margin: "md",
+              contents: [
+                { 
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    { 
+                      type: "text",
+                      text: "Protein:",
+                      size: "sm",
+                      color: "#555555",
+                      flex: 3 
+                    },
+                    { 
+                      type: "text",
+                      text: `${ foodData.totalProtein }g`,
+                      size: "sm",
+                      color: "#111111",
+                      align: "end",
+                      flex: 2 
+                    }
+                  ]
+                },
+                { 
+                  type: "box",
+                  layout: "horizontal",
+                  margin: "sm",
+                  contents: [
+                    { 
+                      type: "text",
+                      text: "Carbs:",
+                      size: "sm",
+                      color: "#555555",
+                      flex: 3 
+                    },
+                    { 
+                      type: "text",
+                      text: `${ foodData.totalCarbs }g`,
+                      size: "sm",
+                      color: "#111111",
+                      align: "end",
+                      flex: 2 
+                    }
+                  ]
+                },
+                { 
+                  type: "box",
+                  layout: "horizontal",
+                  margin: "sm",
+                  contents: [
+                    { 
+                      type: "text",
+                      text: "Fat:",
+                      size: "sm",
+                      color: "#555555",
+                      flex: 3 
+                    },
+                    { 
+                      type: "text",
+                      text: `${ foodData.totalFat }g`,
+                      size: "sm",
+                      color: "#111111",
+                      align: "end",
+                      flex: 2 
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        footer: { 
+          type: "box",
+          layout: "vertical",
+          contents: [
+            { 
+              type: "text",
+              text: "Healthier Alternatives",
+              weight: "bold",
+              color: "#1DB446",
+              size: "sm"
+            },
+            { 
+              type: "text",
+              text: foodData.healthierAlternatives || "No specific alternatives provided",
+              wrap: true,
+              size: "xs",
+              margin: "md"
+            },
+            { 
+              type: "button",
+              action: { 
+                type: "message",
+                label: "Analyze Another Food",
+                text: "Analyze food"
+              },
+              style: "primary",
+              margin: "md"
+            }
+          ]
+        },
+        styles: { 
+          footer: { 
+            separator: true 
+          }
         }
+      }
     };
-}
+  };
+
+  // Add image parameter to createErrorFlexMessage function (with a default value for when no image is provided)
+const createErrorFlexMessage = (title, message, imageUrl = null) => { 
+    const contents = {
+      type: "bubble",
+      body: { 
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { 
+            type: "text",
+            text: title,
+            weight: "bold",
+            size: "xl",
+            color: "#ff0000"
+          },
+          { 
+            type: "text",
+            text: message,
+            wrap: true,
+            margin: "md"
+          }
+        ]
+      },
+      footer: { 
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { 
+            type: "button",
+            action: { 
+              type: "message",
+              label: "Try Again",
+              text: "Analyze food"
+            },
+            style: "primary"
+          }
+        ]
+      }
+    };
+  
+    // Add the hero image if imageUrl is provided
+    if (imageUrl) {
+      contents.hero = {
+        type: "image",
+        url: imageUrl,
+        size: "full",
+        aspectRatio: "20:13",
+        aspectMode: "cover"
+      };
+    }
+  
+    return { 
+      type: "flex",
+      altText: title,
+      contents: contents
+    };
+  };
 
 // Deploy to Firebase
 exports.lineBot = functions.https.onRequest(app);
