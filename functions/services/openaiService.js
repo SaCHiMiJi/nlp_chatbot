@@ -5,9 +5,7 @@ const logger = require("../utils/logger");
 // Initialize OpenAI client with API key from environment
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY || 
-          (process.env.FIREBASE_CONFIG ? 
-            JSON.parse(process.env.FIREBASE_CONFIG).openai.api_key : 
-            '')
+          (process.env.FIREBASE_CONFIG )
 });
 
 /**

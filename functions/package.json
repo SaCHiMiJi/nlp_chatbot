@@ -18,14 +18,18 @@
   "main": "index.js",
   "dependencies": {
     "@line/bot-sdk": "^7.5.2",
-    "axios": "^1.6.2",
+    "axios": "^1.8.1",
     "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dialogflow": "^4.0.3",
     "dotenv": "^16.4.7",
-    "express": "^4.18.2",
+    "express": "^4.21.2",
     "firebase-admin": "^13.1.0",
     "firebase-functions": "^6.3.2",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.20.1",
+    "request": "^2.88.2",
+    "request-promise": "^0.0.1",
     "uuid-v4": "^0.1.0"
   },
   "devDependencies": {
